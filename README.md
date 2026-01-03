@@ -1,0 +1,1 @@
+# cosmic-ext-applet-configurable-button
