@@ -1,0 +1,11 @@
+app-title = Cosmic Ext Applet Configurable Button
+about = About
+view = View
+welcome = Welcome to COSMIC! ✨
+page-id = Page { $num }
+git-description = Git commit {$hash} on {$date}
+example-row = Example Row
+on-script = On Script
+off-script = Off Script
+status-script = Status Script
+run-interval = Run Interval
