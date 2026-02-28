@@ -10,11 +10,11 @@ repository = "https://github.com/pop-os/cosmic-app-template"
 futures-util = "0.3.31"
 i18n-embed-fl = "0.10"
 rust-embed = "8.7.2"
-tokio = { version = "1.48.0", features = ["full"] }
+tokio = { version = "1.49.0", features = ["full"] }
 tracing = { version = "0.1.41", default-features = false, features = ["log"] }
 tracing-subscriber = { version = "0.3.20", default-features = false, features = [
-	"ansi",
-	"env-filter",
+    "ansi",
+    "env-filter",
 ] }
 
 [dependencies.i18n-embed]

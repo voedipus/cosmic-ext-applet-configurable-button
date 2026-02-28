@@ -11,6 +11,7 @@ use cosmic::iced_winit::commands::popup::{destroy_popup, get_popup};
 use cosmic::widget::mouse_area;
 use cosmic::{prelude::*, widget};
 use futures_util::SinkExt;
+use tokio::task::spawn_blocking;
 use tracing::{error, info};
 
 /// The application model stores app-specific state used to describe its interface and
@@ -36,6 +37,10 @@ pub enum Message {
     ToggleSettings,
     PopupClosed(Id),
     CheckStatus,
+    ScriptFinished,
+    ScriptFailed,
+    StatusChecked,
+    StatusCheckFailed,
     UpdateConfig(Config),
     UpdOnScript(String),
     UpdOffScript(String),
@@ -209,51 +214,64 @@ impl cosmic::Application for AppModel {
         match message {
             Message::CheckStatus => {
                 info!("Checking status");
-                match Command::new("sh")
-                    .arg("-c")
-                    .arg(&self.config.status_script)
-                    .spawn()
-                    .map_err(|e| error!("Failed to spawn: {}", e))
-                {
-                    Ok(mut child) => {
-                        match child
-                            .wait()
-                            .map_err(|e| error!("Failed to execute status script: {}", e))
-                        {
-                            Ok(status) => self.status = status.success(),
-                            Err(_) => self.status = false,
+                let script = self.config.status_script.clone();
+                return cosmic::task::future(async move {
+                    let result =
+                        spawn_blocking(move || Command::new("sh").arg("-c").arg(script).status())
+                            .await
+                            .unwrap();
+
+                    if let Ok(status) = result {
+                        if status.success() {
+                            Message::StatusChecked
+                        } else {
+                            Message::StatusCheckFailed
                         }
+                    } else {
+                        Message::StatusCheckFailed
                     }
-                    Err(_) => self.status = false,
-                }
+                });
             }
             Message::UpdateConfig(config) => {
                 self.config = config;
             }
-            Message::Toggle => match self.status {
-                true => {
-                    info!("Running off script {}", &self.config.off_script);
-                    if let Ok(_) = Command::new("sh")
-                        .arg("-c")
-                        .arg(&self.config.off_script)
-                        .status()
-                        .map_err(|e| error!("Failed to execute off script: {}", e))
-                    {
-                        self.status = false;
+            Message::Toggle => {
+                let script = if self.status {
+                    self.config.off_script.clone()
+                } else {
+                    self.config.on_script.clone()
+                };
+                info!("Executing script: {}", script);
+
+                return cosmic::task::future(async move {
+                    let result =
+                        spawn_blocking(move || Command::new("sh").arg("-c").arg(script).status())
+                            .await
+                            .unwrap();
+                    if let Ok(status) = result {
+                        if status.success() {
+                            Message::ScriptFinished
+                        } else {
+                            Message::ScriptFailed
+                        }
+                    } else {
+                        Message::ScriptFailed
                     }
-                }
-                false => {
-                    info!("Running on script");
-                    if let Ok(_) = Command::new("sh")
-                        .arg("-c")
-                        .arg(&self.config.on_script)
-                        .status()
-                        .map_err(|e| error!("Failed to execute on script: {}", e))
-                    {
-                        self.status = true;
-                    }
-                }
-            },
+                });
+            }
+            Message::ScriptFinished => {
+                info!("Script finished");
+                self.status = !self.status;
+            }
+            Message::ScriptFailed => {
+                info!("Script failed");
+            }
+            Message::StatusChecked => {
+                self.status = true;
+            }
+            Message::StatusCheckFailed => {
+                self.status = false;
+            }
             Message::ToggleSettings => {
                 return if let Some(p) = self.popup.take() {
                     destroy_popup(p)
